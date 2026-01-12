@@ -1,0 +1,45 @@
+pip install tensorflow numpy
+import numpy as np
+import pandas as pd
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import GRU, Dense
+from sklearn.preprocessing import MinMaxScaler
+import matplotlib.pyplot as plt
+np.random.seed(42)
+days = 1825
+trend = np.linspace(50, 200, days)
+seasonality = 20 * np.sin(np.linspace(0, 50*np.pi, days))
+noise = 10 * np.random.randn(days)
+demand = trend + seasonality + noise
+data = pd.DataFrame({'demand': demand})
+demand = data['demand'].values.reshape(-1,1)
+scaler = MinMaxScaler()
+data_scaled = scaler.fit_transform(data)
+def create_sequences(data, seq_length=30):
+    X = []
+    y = []
+    for i in range(len(data) - seq_length):
+        X.append(data[i:i+seq_length])
+        y.append(data[i+seq_length])
+    return np.array(X), np.array(y)
+SEQ_LENGTH = 30  
+X, y = create_sequences(data_scaled, SEQ_LENGTH)
+train_size = int(len(X) * 0.8)
+X_train, X_test = X[:train_size], X[train_size:]
+y_train, y_test = y[:train_size], y[train_size:]
+model = Sequential()
+model.add(GRU(50, activation='tanh', input_shape=(SEQ_LENGTH, 1)))
+model.add(Dense(1))  # output layer
+model.compile(optimizer='adam', loss='mse')
+history = model.fit(X_train, y_train, epochs=50, batch_size=32, validation_data=(X_test, y_test), verbose=1)
+y_pred = model.predict(X_test)
+y_test_inv = scaler.inverse_transform(y_test)
+y_pred_inv = scaler.inverse_transform(y_pred)
+plt.figure(figsize=(12,6))
+plt.plot(y_test_inv, label='Actual Demand')
+plt.plot(y_pred_inv, label='Predicted Demand')
+plt.title("Electricity Demand Forecasting using GRU")
+plt.xlabel("Days")
+plt.ylabel("Demand")
+plt.legend()
+plt.show()
